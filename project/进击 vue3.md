@@ -12,6 +12,7 @@
 3. [[vue3-directives]]
 4. [[vue3-emit]]
 5. [[vue3-slot]]
+6. [[看的见的思考 - 分析 vue3 的 eslint 官方配置]]
 
 ## 产出
 1. [[测试vue组件的三个要领]]
