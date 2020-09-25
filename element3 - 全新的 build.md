@@ -249,6 +249,9 @@ bootstrap-vue 这个库是通过 node-sass + post-css 来单独编译的 scss �
 之前的逻辑是打包完 css 之后，把它复制到 lib 文件夹 下，然后发布的时候把 lib 也发布上去即可
 
 
+## 总结
+- [[库打包需要支持的坏境]]
+
 
 ## 参考资料
 - [深入学习rollup来进行打包](https://www.cnblogs.com/tugenhua0707/p/8179686.html)
