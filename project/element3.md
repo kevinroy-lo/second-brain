@@ -34,6 +34,5 @@
 
 
 ## 常用命令
-- 上传静态资源到服务器
-	- 需要在 element-ui 路径下执行
-	- tcb hosting:deploy . -e element3-0gsg8qiu30d7313a
+- 部署 website
+	- env DEPLOY_TOKEN="element3-0gsg8qiu30d7313a" yarn workspace website deploy
