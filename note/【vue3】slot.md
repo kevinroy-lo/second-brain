@@ -421,3 +421,260 @@ export const updateSlots = (
 看来我得找点 test 来看看
 
 奶奶的，test 也没有几个， 那 slot 先放一放，让 R脑 思考思考
+
+---
+
+再次看 slot 的实现
+
+先来从使用的角度来看
+
+Component 组件类型下的 children 就是 slot 了
+而组件在初始化的时候，会把 children render 出来，而 slot 接收的是 object，而我们知道 children 必须是 array 类型，
+并且需要把 slots 存储到 instance.slots 对象内
+其实还有一个点，是组件必须定义了 slot 才可以渲染
+
+这里总结一下：
+- component slot（children）需要规范一下格式
+- 需要把 slot 存储到 instance.slots 内
+- 当前的这个 slots 要不要渲染（只有加入到 children 内了，那么就是可以渲染的）
+
+那么基于以上几点，我们在重新看看源码
+
+
+```js
+export const initSlots = (
+  instance: ComponentInternalInstance,
+  children: VNodeNormalizedChildren
+) => {
+  // 是在哪里初始化 slots_children 这个 flag 的
+  if (instance.vnode.shapeFlag & ShapeFlags.SLOTS_CHILDREN) {
+    const type = (children as RawSlots)._
+    if (type) {
+      instance.slots = children as InternalSlots
+      // make compiler marker non-enumerable
+      def(children as InternalSlots, '_', type)
+    } else {
+      normalizeObjectSlots(children as RawSlots, (instance.slots = {}))
+    }
+  } else {
+    instance.slots = {}
+    if (children) {
+      normalizeVNodeSlots(instance, children)
+    }
+  }
+  def(instance.slots, InternalObjectKey, 1)
+}
+```
+
+先看 else 里面的逻辑，最重要的就是 normalizeVNodeSlots 了，也就是我们上面谈到的规范化 slots
+
+```js
+
+const normalizeVNodeSlots = (
+  instance: ComponentInternalInstance,
+  children: VNodeNormalizedChildren
+) => {
+  const normalized = normalizeSlotValue(children)
+  instance.slots.default = () => normalized
+}
+
+```
+
+因为这个 else 逻辑其实是只有一个 slot 的情况，所以这里是直接赋值给了 instance.slots.default  ，这里其实也就是我们谈到的第二点，给 instance.slots 赋值
+
+> 至于是怎么 normalize 的，这里先不需要关心
+
+看逻辑的话，只有对应的 initSlot 逻辑，并没有其他的逻辑做处理了
+
+那基于编译后生成的代码来看的话，一个组件的 children 可以是一个 object，里面有个默认值是 default ，那么也就是说 render 的时候 children 是允许是 object？ 还是说在 render 之前会对 children 做规范化操作？
+
+```js
+// 编译后
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+  const _component_Comp = _resolveComponent("Comp")
+
+  return (_openBlock(), _createBlock("div", { id: "app" }, [
+    _createVNode(_component_Comp, null, {
+      default: _withCtx(() => [
+        _createTextVNode(" 1233 ")
+      ]),
+      _: 1
+    })
+  ]))
+}
+```
+
+
+那么我要带着这个疑问去看看在哪里处理的 children. default  的这个操作
+
+果然，我在 vnode.ts 中找到了处理 children.default 的这个逻辑
+```js
+export function normalizeChildren(vnode: VNode, children: unknown) {
+  let type = 0
+  const { shapeFlag } = vnode
+  if (children == null) {
+    children = null
+  } else if (isArray(children)) {
+    type = ShapeFlags.ARRAY_CHILDREN
+  } else if (typeof children === 'object') {
+    if (shapeFlag & ShapeFlags.ELEMENT || shapeFlag & ShapeFlags.TELEPORT) {
+      // Normalize slot to plain children for plain element and Teleport
+      const slot = (children as any).default
+      if (slot) {
+        // _c marker is added by withCtx() indicating this is a compiled slot
+        slot._c && setCompiledSlotRendering(1)
+        normalizeChildren(vnode, slot())
+        slot._c && setCompiledSlotRendering(-1)
+      }
+      return
+    } else {
+      type = ShapeFlags.SLOTS_CHILDREN
+      const slotFlag = (children as RawSlots)._
+      if (!slotFlag && !(InternalObjectKey in children!)) {
+        // if slots are not normalized, attach context instance
+        // (compiled / normalized slots already have context)
+        ;(children as RawSlots)._ctx = currentRenderingInstance
+      } else if (slotFlag === SlotFlags.FORWARDED && currentRenderingInstance) {
+        // a child component receives forwarded slots from the parent.
+        // its slot type is determined by its parent's slot type.
+        if (
+          currentRenderingInstance.vnode.patchFlag & PatchFlags.DYNAMIC_SLOTS
+        ) {
+          ;(children as RawSlots)._ = SlotFlags.DYNAMIC
+          vnode.patchFlag |= PatchFlags.DYNAMIC_SLOTS
+        } else {
+          ;(children as RawSlots)._ = SlotFlags.STABLE
+        }
+      }
+    }
+  } else if (isFunction(children)) {
+    children = { default: children, _ctx: currentRenderingInstance }
+    type = ShapeFlags.SLOTS_CHILDREN
+  } else {
+    children = String(children)
+    // force teleport children to array so it can be moved around
+    if (shapeFlag & ShapeFlags.TELEPORT) {
+      type = ShapeFlags.ARRAY_CHILDREN
+      children = [createTextVNode(children as string)]
+    } else {
+      type = ShapeFlags.TEXT_CHILDREN
+    }
+  }
+  vnode.children = children as VNodeNormalizedChildren
+  vnode.shapeFlag |= type
+}
+```
+
+代码有点多，但是我们现在可以只关心两个逻辑点
+- 是如何处理 default 的操作的
+- 是在什么时候调用的 normalizeChildren
+
+
+```js
+type = ShapeFlags.SLOTS_CHILDREN
+      const slotFlag = (children as RawSlots)._
+      if (!slotFlag && !(InternalObjectKey in children!)) {
+        // if slots are not normalized, attach context instance
+        // (compiled / normalized slots already have context)
+        ;(children as RawSlots)._ctx = currentRenderingInstance
+      } else if (slotFlag === SlotFlags.FORWARDED && currentRenderingInstance) {
+        // a child component receives forwarded slots from the parent.
+        // its slot type is determined by its parent's slot type.
+        if (
+          currentRenderingInstance.vnode.patchFlag & PatchFlags.DYNAMIC_SLOTS
+        ) {
+          ;(children as RawSlots)._ = SlotFlags.DYNAMIC
+          vnode.patchFlag |= PatchFlags.DYNAMIC_SLOTS
+        } else {
+          ;(children as RawSlots)._ = SlotFlags.STABLE
+        }
+      }
+```
+
+这里要不就是给 chidlren._ctx 赋值 ，要不就是对 children._ 赋值，
+
+基于把 vnode.patchFlag 做了一个更改，
+
+那么也就是说，在后面的操作是利用了 children._  或者是 chidlren._ctx 做了一定的处理
+
+通过全局搜索 RawSlots 发现了一个 renderSlot.ts 文件
+
+这个文件应该是重点了
+
+TODO -> 分析 renderSlot.ts 文件逻辑
+
+终于找到了，是在什么时候用的 instance.slots 的了，并且是怎么给转换成 children 的了
+
+一切的答案都在这里
+
+```js
+
+// template
+<div\>
+
+<slot\></slot\>
+
+</div\>
+
+// 编译后
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+
+	return (_openBlock(), _createBlock("div", null, [
+
+	_renderSlot(_ctx.$slots, "default")
+]))
+}
+
+```
+
+可以看到，如果一个组件内只有声明了 slot 之后，才会调用到 renderSlot 这个函数
+	
+而这个函数干了什么
+
+
+```js
+export function renderSlot(
+  slots: Slots,
+  name: string,
+  props: Data = {},
+  // this is not a user-facing function, so the fallback is always generated by
+  // the compiler and guaranteed to be a function returning an array
+  fallback?: () => VNodeArrayChildren
+): VNode {
+  let slot = slots[name]
+
+  // a compiled slot disables block tracking by default to avoid manual
+  // invocation interfering with template-based block tracking, but in
+  // `renderSlot` we can be sure that it's template-based so we can force
+  // enable it.
+  isRenderingCompiledSlot++
+  openBlock()
+  const validSlotContent = slot && ensureValidVNode(slot(props))
+  const rendered = createBlock(
+    Fragment,
+    { key: props.key || `_${name}` },
+    validSlotContent || (fallback ? fallback() : []),
+    validSlotContent && (slots as RawSlots)._ === SlotFlags.STABLE
+      ? PatchFlags.STABLE_FRAGMENT
+      : PatchFlags.BAIL
+  )
+  isRenderingCompiledSlot--
+  return rendered
+}
+
+```
+
+可以发现，这里是从 slots 中取的数据，而最终这个函数返回的是一个  vnode
+
+而结合上面编译的结果来看，最终这个 vnode 会添加到 createBlock 中
+
+所以，最关键的信息就是在 initSlot 的时候我们只是存储信息， 把数据放到 instance.slots 中，然后当组件有 slot 的时候，才从 Instance.slots 中拿到具体的数据，给到 createBlock 中，最终渲染出来
+
+
+---
+
+todo ， 好，这个流程其实已经出来了，那么剩下的就是把所有的逻辑用脑图整理出来
+
+	
+	
+
