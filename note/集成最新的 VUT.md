@@ -65,6 +65,33 @@
 
 
 
+## 支持 ts
+需要额外安装几个插件
+1. 基于这个文档[安装 babel](https://jestjs.io/docs/en/getting-started#using-typescript)
+2. 安装 ts-jest (为了可以解析 ts)
+3. 修改 jest.config.js
+```js
+	module.exports = {
+  testEnvironment: 'jsdom',
+  transform: {
+    //  用 `vue-jest` 处理 `*.vue` 文件
+    '^.+\\.vue$': 'vue-jest',
+    '^.+\\.jsx?$': 'babel-jest', // Adding this line solved the issue
+    '^.+\\.tsx?$': 'ts-jest',
+  },
+  // 告诉 Jest 处理 `*.vue` 文件
+  moduleFileExtensions: ['vue', 'js', 'json', 'jsx', 'ts', 'tsx', 'node'],
+}
+```
+4. 修改 tsconfig.json
+
+需要把这个 jest 添加进去，这样的话才有 type 提示
+```js
+"types": ["vite/client", "jest"],
+```
+	
+
+
 ## 总结
 
 其实就是按照参考资料一点点的安装依赖即可
