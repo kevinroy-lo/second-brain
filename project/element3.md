@@ -16,6 +16,7 @@
 - [[【element3】解决 dev 和 prod 坏境下逻辑不一致的问题 - getInstance().ctx 的问题]]
 - [[【element3】重写 Message 组件]]
 - [[【element3】重写 Button 组件]]
+- [[ 把 element3 部署到自己的服务器上]]
 
 
 ## 远程团队管理
