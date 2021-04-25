@@ -37,3 +37,13 @@
 ## 常用命令
 - 部署 website
 	- env DEPLOY_TOKEN="element3-0gsg8qiu30d7313a" yarn workspace website deploy
+	
+## headless-element
+
+编写纯逻辑的组件库，面向未来的
+
+### 看得见的思考
+
+需要先调研 headlessui 的组件实现
+
+- [[学习 headlessui 的 switch 组件的实现]]
