@@ -492,3 +492,88 @@ setup(props, { slots, attrs }) {
 本质上就是几个类之间的调用
 
 那么所以，基于 provide 和 inject 来获取组件和组件之间实例，然后把逻辑联合起来。
+
+
+---
+
+继续， 看看 如何 as 是 template 的话，那么是如何处理的
+
+具体逻辑在 utils/render.ts 里面的 _render 函数
+
+```js
+// _render 
+
+ if (as === 'template') {
+    if (Object.keys(passThroughProps).length > 0 || Object.keys(attrs).length > 0) {
+      let [firstChild, ...other] = children ?? []
+
+      if (!isValidElement(firstChild) || other.length > 0) {
+        throw new Error(
+          [
+            'Passing props on "template"!',
+            '',
+            `The current component <${name} /> is rendering a "template".`,
+            `However we need to passthrough the following props:`,
+            Object.keys(passThroughProps)
+              .concat(Object.keys(attrs))
+              .map(line => `  - ${line}`)
+              .join('\n'),
+            '',
+            'You can apply a few solutions:',
+            [
+              'Add an `as="..."` prop, to ensure that we render an actual element instead of a "template".',
+              'Render a single element as the child so that we can forward the props onto that element.',
+            ]
+              .map(line => `  - ${line}`)
+              .join('\n'),
+          ].join('\n')
+        )
+      }
+
+      return cloneVNode(firstChild, passThroughProps as Record<string, any>)
+    }
+
+    if (Array.isArray(children) && children.length === 1) {
+      return children[0]
+    }
+
+    return children
+  }
+
+```
+
+基于从后往前推的策略
+
+最终是返回一个 vnode ， 这个有可能是 children 有可能是 children[0] ，也有可能是基于 cloneVNode 创建的
+
+那看看 children 是谁， 哦，是   let children = slots.default?.(slot) (默认的 slot 的内容)
+
+一开始的时候是判断了
+
+```js
+    if (Object.keys(passThroughProps).length > 0 || Object.keys(attrs).length > 0) {
+
+```
+
+这是看有没有给这个组件传值（props 或者是 在 attrs 内的值）
+
+如果有的话，那么就需要基于 cloneVNode 创建一个新的
+
+难道是因为有了 props 或者 attrs 了，就不能复用之前的 vnode 了？
+
+---
+
+在接下来的是看如果 children 是个数组的话，那么只去 children 第一个值，只有是多个根节点的时候 children 才是数组
+
+不然的话，就直接返回 children
+
+---
+
+那么把 switchGroup 的逻辑带入的话，就是：
+
+switchProps 的 props 肯定是有值的，而且只有一个根节点，那么就是吧 switchProps 的 children 都渲染出来了。
+
+那么其实如果一个组件的 as 是 template 的话，那么这个组件就是一个容器组件，只在里面组合逻辑，自己不渲染任何东西（直接把 children 渲染出来）
+
+
+
