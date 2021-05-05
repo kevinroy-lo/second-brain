@@ -1,7 +1,7 @@
 ## 都是啥
 
 - [[单一职责原则（SRP）]]（Single responsibility principle，SRP）
-- [[开放封闭原则]]（Open–closed principle，OCP）
+- [[开放封闭原则(ocp)]]（Open–closed principle，OCP）
 - [[Liskov 替换原则]]（Liskov substitution principle，LSP）
 - [[接口隔离原则]]（Interface segregation principle，ISP）
 - [[依赖倒置原则]]（Dependency inversion principle，DIP）
