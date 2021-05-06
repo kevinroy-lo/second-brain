@@ -18,5 +18,6 @@
 - [[集成最新的 VUT]]
 - [[测试vue组件的三个要领]]
 - [[vue master 解读 composition api 的最佳实践]]
+- [[【vue3】组件更新]]
 
 
